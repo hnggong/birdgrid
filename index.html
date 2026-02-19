@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BirdGrid</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #fff; }
+  #top { padding: 0 20px 0 0; display: flex; align-items: stretch; gap: 14px; border-bottom: 1px solid #ccc; flex-wrap: wrap; font-size: 13px; background: rgba(255,255,255,0.95); min-height: 49px; position: relative; z-index: 1000; }
+  #top h1 { font-size: 16px; font-weight: normal; }
+  #logo {
+    display: flex; flex-direction: row; gap: 0px;
+    flex-shrink: 0;
+    margin-right: 14px;
+    align-self: flex-start;
+  }
+  #logo span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 23px;
+    font-size: 14px; font-weight: bold; color: #fff;
+    outline: 0.5px solid rgba(255,255,255,0.35);
+    outline-offset: -0.5px;
+    line-height: 1;
+  }
+  #app-subtitle { font-size: 14px; font-weight: normal; color: #333; align-self: center; }
+  #status { font-size: 13px; color: #555; align-self: center; }
+  #top > *:not(#logo) { align-self: center; }
+  .filter-group { display: none; align-items: center; gap: 6px; }
+  #toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+
+  /* Language toggle */
+  #lang-toggle { position: fixed; top: 10px; right: 20px; display: flex; align-items: center; z-index: 2000; }
+  .lang-pill {
+    display: flex; border: 1px solid #ccc; overflow: hidden;
+  }
+  .lang-pill button {
+    border: none; border-right: 1px solid #ccc;
+    background: #fff; cursor: pointer;
+    padding: 4px 10px;
+    font-size: 13px; color: #555;
+  }
+  .lang-pill button:last-child { border-right: none; }
+  .lang-pill button.active { background: #e8e8e8; color: #000; font-weight: bold; }
+  .lang-pill button:hover:not(.active) { background: #f5f5f5; }
+
+  /* Date picker button */
+  #date-btn { padding: 4px 10px; font-size: 13px; cursor: pointer; border: 1px solid #ccc; background: #fff; white-space: nowrap; }
+  #date-btn.active { border-color: #00c; color: #00c; }
+
+  /* Date picker popup */
+  #date-picker-popup {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #ccc;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    padding: 0; width: 340px;
+  }
+  #date-picker-popup.open { display: block; }
+
+  .dp-tabs { display: flex; border-bottom: 1px solid #ddd; }
+  .dp-tab { flex: 1; text-align: center; padding: 8px 4px; font-size: 12px; border: none; background: #f8f8f8; cursor: pointer; border-right: 1px solid #ddd; }
+  .dp-tab:last-child { border-right: none; }
+  .dp-tab.active { background: #fff; font-weight: bold; color: #00c; border-bottom: 2px solid #00c; }
+
+  .dp-body { padding: 12px; }
+
+  /* Calendar */
+  .cal-wrap { user-select: none; }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-nav { background: none; border: none; font-size: 16px; cursor: pointer; color: #333; padding: 2px 8px; }
+  .cal-nav:hover { background: #eee; border-radius: 3px; }
+  .cal-title { font-size: 13px; font-weight: bold; display: flex; gap: 6px; }
+  .cal-title select { font-size: 13px; border: 1px solid #ccc; padding: 2px 4px; cursor: pointer; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-dow { text-align: center; font-size: 11px; color: #888; padding: 3px 0; font-weight: bold; }
+  .cal-day {
+    text-align: center; padding: 5px 2px; font-size: 12px; cursor: pointer;
+    border-radius: 3px; border: 1px solid transparent;
+  }
+  .cal-day:hover { background: #eef; }
+  .cal-day.today { border-color: #99b; }
+  .cal-day.selected { background: #00c; color: #fff; border-radius: 3px; }
+  .cal-day.in-range { background: #dde8ff; }
+  .cal-day.range-start { background: #00c; color: #fff; border-radius: 3px 0 0 3px; }
+  .cal-day.range-end { background: #00c; color: #fff; border-radius: 0 3px 3px 0; }
+  .cal-day.other-month { color: #bbb; }
+  .cal-day.disabled { color: #ddd; cursor: default; pointer-events: none; }
+
+  /* Year/Month grid pickers */
+  .grid-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px; }
+  .grid-picker .gp-item {
+    text-align: center; padding: 7px 4px; font-size: 12px; cursor: pointer;
+    border: 1px solid #ddd; border-radius: 3px;
+  }
+  .grid-picker .gp-item:hover { background: #eef; border-color: #99b; }
+  .grid-picker .gp-item.selected { background: #00c; color: #fff; border-color: #00c; }
+  .grid-picker .gp-item.in-range { background: #dde8ff; border-color: #aac; }
+
+  .year-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .year-nav button { background: none; border: none; font-size: 16px; cursor: pointer; padding: 2px 8px; }
+  .year-nav button:hover { background: #eee; border-radius: 3px; }
+  .year-nav span { font-size: 13px; font-weight: bold; }
+
+  .dp-actions { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #eee; }
+  .dp-actions button { font-size: 12px; padding: 5px 14px; cursor: pointer; border-radius: 3px; }
+  #dp-apply { background: #00c; color: #fff; border: none; }
+  #dp-apply:hover { background: #009; }
+  #dp-clear { background: #fff; border: 1px solid #ccc; }
+  #dp-clear:hover { background: #f5f5f5; }
+  .dp-hint { font-size: 11px; color: #888; padding: 0 12px 8px; min-height: 16px; }
+
+  /* Species */
+  #species-wrap { position: relative; }
+  #species-input { width: 150px; font-size: 13px; padding: 3px 5px; border: 1px solid #ccc; }
+  #species-dropdown {
+    display: none; position: absolute; top: 100%; left: 0; z-index: 9999;
+    background: #fff; border: 1px solid #ccc; max-height: 220px; overflow-y: auto;
+    width: 240px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  #species-dropdown div { cursor: pointer; }
+  #species-dropdown div:hover { background: #eef; }
+  #species-dropdown div.selected { background: #dde8ff; }
+  #selected-tags { display: flex; flex-wrap: wrap; gap: 4px; max-width: 320px; }
+  .species-tag { background: #dde8ff; border: 1px solid #99b; border-radius: 3px; padding: 2px 6px; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .remove-tag { cursor: pointer; color: #555; font-weight: bold; }
+
+  #map-wrap { position: relative; width: 100%; height: calc(100vh - 49px); }
+  #map { width: 100%; height: 100%; }
+  #right-panel { position: absolute; right: 12px; bottom: 40px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  #legend { background: rgba(255,255,255,0.9); padding: 10px 14px; border: 1px solid #ccc; font-size: 12px; line-height: 1.8; }
+  .legend-row { display: flex; align-items: center; gap: 8px; }
+  .legend-swatch { width: 18px; height: 18px; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+  #slider-panel { background: rgba(255,255,255,0.9); border: 1px solid #ccc; padding: 10px 8px; display: none; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; width: fit-content; }
+  #cell-slider { writing-mode: vertical-lr; direction: rtl; height: 120px; cursor: pointer; }
+
+  /* Cell popup */
+  #cell-popup {
+    display: none; position: fixed; z-index: 9998;
+    background: rgba(255,255,255,0.96);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+    padding: 0;
+    min-width: 380px; max-width: 520px;
+    max-height: 420px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  #cell-popup.open { display: flex; flex-direction: column; }
+  #cell-popup-header {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid #eee;
+    font-weight: bold; font-size: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #cell-popup-close {
+    cursor: pointer; font-size: 18px; color: #888; line-height: 1;
+    background: none; border: none; padding: 0 2px;
+  }
+  #cell-popup-close:hover { color: #333; }
+  #cell-popup-body { overflow-y: auto; flex: 1; }
+  #cell-popup-body table { width: 100%; border-collapse: collapse; }
+  #cell-popup-body th {
+    position: sticky; top: 0; background: #f5f5f5;
+    padding: 6px 10px; text-align: left; font-size: 12px;
+    color: #555; border-bottom: 1px solid #ddd; white-space: nowrap;
+  }
+  #cell-popup-body td {
+    padding: 5px 10px; border-bottom: 1px solid #f0f0f0;
+    font-size: 12px; vertical-align: top; white-space: nowrap;
+  }
+  #cell-popup-body td:last-child { white-space: normal; }
+  #cell-popup-body tr:last-child td { border-bottom: none; }
+  #cell-popup-body tr:hover td { background: #f9f9ff; }
+  #cell-popup-body a { color: #00c; text-decoration: none; }
+  #cell-popup-body a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="top">
+  <div id="logo"><span style="background:rgba(111,140,227,0.66)">b</span><span style="background:rgba(83,106,211,0.75)">i</span><span style="background:rgba(125,158,235,0.61)">r</span><span style="background:rgba(97,124,219,0.70)">d</span><span style="background:rgba(62,81,199,0.81)">g</span><span style="background:rgba(90,115,215,0.72)">r</span><span style="background:rgba(48,64,191,0.86)">i</span><span style="background:rgba(76,98,207,0.77)">d</span></div><span id="app-subtitle">eBird Observation Map</span>
+  <label id="file-label" style="font-size:13px;cursor:pointer;border:1px solid #4466cc;border-radius:5px;padding:4px 12px;background:#fff;white-space:nowrap;display:inline-flex;align-items:center;color:#4466cc">
+    <span id="file-label-text">Choose File</span>
+    <input type="file" id="file-input" accept=".csv" style="display:none">
+  </label>
+  <span id="file-name" style="font-size:13px;color:#555"></span>
+
+  <div class="filter-group" id="date-filter-wrap" style="position:relative">
+    <button id="date-btn">Date: All</button>
+    <div id="date-picker-popup">
+      <div class="dp-tabs">
+        <div class="dp-tab active" data-mode="day-range">Day range</div>
+        <div class="dp-tab" data-mode="month-range">Month range</div>
+        <div class="dp-tab" data-mode="year-range">Year range</div>
+      </div>
+      <div class="dp-body" id="dp-body"></div>
+      <div class="dp-hint" id="dp-hint"></div>
+      <div class="dp-actions">
+        <button id="dp-apply">Apply</button>
+        <button id="dp-clear">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-group" id="species-filter-wrap">
+    <label style="font-size:13px">Species:</label>
+    <div id="species-wrap">
+      <input type="text" id="species-input" placeholder="Search..." autocomplete="off">
+      <div id="species-dropdown"></div>
+    </div>
+    <div id="selected-tags"></div>
+    <button id="clear-species" style="font-size:12px;padding:3px 7px;cursor:pointer;display:none">Clear all</button>
+  </div>
+
+  <div id="toggle-wrap" style="display:none">
+    <label><input type="radio" name="mode" value="observations" checked> Observations</label>
+    <label><input type="radio" name="mode" value="species"> Species</label>
+  </div>
+  <span id="status">Upload your eBird CSV to begin.</span>
+  <div id="lang-toggle"><div class="lang-pill"><button id="btn-en" class="active">A</button><button id="btn-zh">文</button></div></div>
+</div>
+
+<div id="map-wrap">
+  <div id="map"></div>
+  <div id="right-panel">
+    <div id="slider-panel">
+      <span style="font-weight:bold;margin-bottom:2px">Cell size</span>
+      <span id="slider-val">1.0×</span>
+      <input type="range" id="cell-slider" min="0.5" max="3" step="0.1" value="1">
+    </div>
+    <div id="legend" style="display:none">
+      <div id="legend-title" style="font-weight:bold;margin-bottom:4px">Observations</div>
+      <div class="legend-row"><span class="legend-swatch" id="s1"></span> <span id="l1"></span></div>
+      <div class="legend-row"><span class="legend-swatch" id="s2"></span> <span id="l2"></span></div>
+      <div class="legend-row"><span class="legend-swatch" id="s3"></span> <span id="l3"></span></div>
+      <div class="legend-row"><span class="legend-swatch" id="s4"></span> <span id="l4"></span></div>
+      <div class="legend-row"><span class="legend-swatch" id="s5"></span> <span id="l5"></span></div>
+    </div>
+  </div>
+  <!-- Cell popup -->
+  <div id="cell-popup">
+    <div id="cell-popup-header">
+      <span id="cell-popup-title"></span>
+      <button id="cell-popup-close">×</button>
+    </div>
+    <div id="cell-popup-body"></div>
+  </div>
+</div>
+
+<script>
+// ===================== MAP SETUP =====================
+const map = L.map('map', { worldCopyJump: true }).setView([20, 0], 2);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+let observations = [], allSpecies = [], selectedSpecies = new Set(), speciesScientific = new Map();
+let cellLayer = null, mode = 'observations', cellScale = 1.0, currentBreaks = [];
+let activeFilter = null;
+
+// ===================== DATE PICKER =====================
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_OF_WEEK = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+let dpMode = 'day-range';
+let dpState = {}; // holds selection state per mode
+
+function resetDpState() {
+  dpState = { start: null, end: null, selecting: false };
+}
+resetDpState();
+
+// --- Day range calendar ---
+let calViewYear = new Date().getFullYear();
+let calViewMonth = new Date().getMonth();
+
+function renderDayRange() {
+  const body = document.getElementById('dp-body');
+  const hint = document.getElementById('dp-hint');
+  hint.textContent = dpState.start && !dpState.end ? t('clickEnd') : dpState.start ? '' : t('clickStart');
+
+  const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+  const daysInPrev = new Date(calViewYear, calViewMonth, 0).getDate();
+  const today = new Date();
+
+  const startVal = dpState.start ? dpState.start.getTime() : null;
+  const endVal = dpState.end ? dpState.end.getTime() : null;
+
+  let days = '';
+  // Prev month fill
+  for (let i = firstDay - 1; i >= 0; i--) {
+    days += `<div class="cal-day other-month">${daysInPrev - i}</div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(calViewYear, calViewMonth, d);
+    const t = dt.getTime();
+    const isToday = dt.toDateString() === today.toDateString();
+    let cls = 'cal-day';
+    if (startVal && endVal) {
+      if (t === startVal) cls += ' range-start';
+      else if (t === endVal) cls += ' range-end';
+      else if (t > startVal && t < endVal) cls += ' in-range';
+    } else if (t === startVal) cls += ' selected';
+    if (isToday) cls += ' today';
+    days += `<div class="${cls}" data-ts="${t}">${d}</div>`;
+  }
+  // Next month fill
+  const total = firstDay + daysInMonth;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= rem; d++) days += `<div class="cal-day other-month">${d}</div>`;
+
+  const yearOpts = [];
+  for (let y = new Date().getFullYear() + 1; y >= 1900; y--) yearOpts.push(`<option value="${y}" ${y===calViewYear?'selected':''}>${y}</option>`);
+  const monthOpts = t('months').map((m,i) => `<option value="${i}" ${i===calViewMonth?'selected':''}>${m}</option>`).join('');
+  const yearFirst = lang === 'zh';
+
+  body.innerHTML = `<div class="cal-wrap">
+    <div class="cal-header">
+      <button class="cal-nav" id="cal-prev">&#8249;</button>
+      <div class="cal-title">
+        ${yearFirst ? `<select id="cal-year">${yearOpts.join('')}</select><select id="cal-month">${monthOpts}</select>` : `<select id="cal-month">${monthOpts}</select><select id="cal-year">${yearOpts.join('')}</select>`}
+      </div>
+      <button class="cal-nav" id="cal-next">&#8250;</button>
+    </div>
+    <div class="cal-grid">
+      ${t('dows').map(d=>`<div class="cal-dow">${d}</div>`).join('')}
+      ${days}
+    </div>
+  </div>`;
+
+  document.getElementById('cal-prev').onclick = () => { calViewMonth--; if(calViewMonth<0){calViewMonth=11;calViewYear--;} renderDayRange(); };
+  document.getElementById('cal-next').onclick = () => { calViewMonth++; if(calViewMonth>11){calViewMonth=0;calViewYear++;} renderDayRange(); };
+  document.getElementById('cal-month').onchange = e => { calViewMonth = parseInt(e.target.value); renderDayRange(); };
+  document.getElementById('cal-year').onchange = e => { calViewYear = parseInt(e.target.value); renderDayRange(); };
+
+  body.querySelectorAll('.cal-day[data-ts]').forEach(el => {
+    el.addEventListener('click', () => {
+      const t = parseInt(el.dataset.ts);
+      const dt = new Date(t);
+      if (!dpState.start || (dpState.start && dpState.end)) {
+        dpState.start = dt; dpState.end = null;
+      } else {
+        if (dt < dpState.start) { dpState.end = dpState.start; dpState.start = dt; }
+        else dpState.end = dt;
+      }
+      renderDayRange();
+    });
+  });
+}
+
+// --- Month range picker ---
+let mrViewYear = new Date().getFullYear();
+
+function renderMonthRange() {
+  const body = document.getElementById('dp-body');
+  const hint = document.getElementById('dp-hint');
+  const sm = dpState.startMonth, em = dpState.endMonth;
+  hint.textContent = sm && !em ? 'Click end month' : '';
+
+  const MONTHS_CUR = t('months');
+  const monthItems = MONTHS_CUR.map((m, i) => {
+    const key = mrViewYear * 100 + i;
+    const sk = sm ? sm.y*100+sm.m : null;
+    const ek = em ? em.y*100+em.m : null;
+    let cls = 'gp-item';
+    if (sk && ek) {
+      if (key === sk) cls += ' selected';
+      else if (key === ek) cls += ' selected';
+      else if (key > sk && key < ek) cls += ' in-range';
+    } else if (sk && key === sk) cls += ' selected';
+    return `<div class="${cls}" data-y="${mrViewYear}" data-m="${i}">${m}</div>`;
+  }).join('');
+
+  const yearOpts = [];
+  for (let y = new Date().getFullYear() + 1; y >= 1900; y--) yearOpts.push(`<option value="${y}" ${y===mrViewYear?'selected':''}>${y}</option>`);
+
+  body.innerHTML = `<div class="year-nav">
+    <button id="mr-prev">&#8249;</button>
+    <span>${mrViewYear}</span>
+    <button id="mr-next">&#8250;</button>
+  </div>
+  <div class="grid-picker" id="month-grid">${monthItems}</div>`;
+
+  document.getElementById('mr-prev').onclick = () => { mrViewYear--; renderMonthRange(); };
+  document.getElementById('mr-next').onclick = () => { mrViewYear++; renderMonthRange(); };
+
+  body.querySelectorAll('#month-grid .gp-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const y = parseInt(el.dataset.y), m = parseInt(el.dataset.m);
+      if (!dpState.startMonth || (dpState.startMonth && dpState.endMonth)) {
+        dpState.startMonth = {y,m}; dpState.endMonth = null;
+      } else {
+        const s = dpState.startMonth;
+        if (y === s.y && m === s.m) {
+          // clicked same month twice — select just that month
+          dpState.endMonth = {y,m};
+        } else if (y*100+m < s.y*100+s.m) {
+          dpState.endMonth = s; dpState.startMonth = {y,m};
+        } else {
+          dpState.endMonth = {y,m};
+        }
+      }
+      renderMonthRange();
+    });
+  });
+}
+
+// --- Year range picker ---
+let yrViewDecade = Math.floor(new Date().getFullYear() / 10) * 10;
+
+function renderYearRange() {
+  const body = document.getElementById('dp-body');
+  const hint = document.getElementById('dp-hint');
+  const sy = dpState.startYear, ey = dpState.endYear;
+  hint.textContent = sy !== undefined && sy !== null && ey === undefined ? 'Click end year' : '';
+
+  const years = [];
+  for (let y = yrViewDecade; y < yrViewDecade + 12; y++) {
+    const sk = sy, ek = ey;
+    let cls = 'gp-item';
+    if (sk !== null && sk !== undefined && ek !== null && ek !== undefined) {
+      if (y === sk || y === ek) cls += ' selected';
+      else if (y > sk && y < ek) cls += ' in-range';
+    } else if (y === sk) cls += ' selected';
+    years.push(`<div class="${cls}" data-y="${y}">${y}</div>`);
+  }
+
+  body.innerHTML = `<div class="year-nav">
+    <button id="yr-prev">&#8249;</button>
+    <span>${yrViewDecade}–${yrViewDecade+11}</span>
+    <button id="yr-next">&#8250;</button>
+  </div>
+  <div class="grid-picker" id="year-grid">${years.join('')}</div>`;
+
+  document.getElementById('yr-prev').onclick = () => { yrViewDecade -= 12; renderYearRange(); };
+  document.getElementById('yr-next').onclick = () => { yrViewDecade += 12; renderYearRange(); };
+
+  body.querySelectorAll('#year-grid .gp-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const y = parseInt(el.dataset.y);
+      if (dpState.startYear === undefined || dpState.startYear === null || dpState.endYear !== undefined) {
+        dpState.startYear = y; dpState.endYear = undefined;
+      } else if (y === dpState.startYear) {
+        // clicked same year twice — select just that year
+        dpState.endYear = y;
+      } else {
+        if (y < dpState.startYear) { dpState.endYear = dpState.startYear; dpState.startYear = y; }
+        else dpState.endYear = y;
+      }
+      renderYearRange();
+    });
+  });
+}
+
+function renderDpBody() {
+  resetDpState();
+  if (dpMode === 'day-range') renderDayRange();
+  else if (dpMode === 'month-range') renderMonthRange();
+  else if (dpMode === 'year-range') renderYearRange();
+}
+
+document.querySelectorAll('.dp-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.dp-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    dpMode = this.dataset.mode;
+    renderDpBody();
+  });
+});
+
+document.getElementById('date-btn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const popup = document.getElementById('date-picker-popup');
+  const isOpen = popup.classList.contains('open');
+  if (!isOpen) {
+    const rect = this.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 4) + 'px';
+    popup.style.left = rect.left + 'px';
+    renderDpBody();
+  }
+  popup.classList.toggle('open');
+});
+
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('date-filter-wrap').contains(e.target) &&
+      !document.getElementById('date-picker-popup').contains(e.target))
+    document.getElementById('date-picker-popup').classList.remove('open');
+});
+
+// Prevent clicks inside popup from bubbling to document
+document.getElementById('date-picker-popup').addEventListener('click', function(e) {
+  e.stopPropagation();
+});
+
+function fmtDate(d) { return t('fmtDate', d.getDate(), d.getMonth()+1, d.getFullYear()); }
+function fmtMonth(o) { return t('fmtMonth', o.m, o.y); }
+
+document.getElementById('dp-apply').addEventListener('click', function() {
+  const btn = document.getElementById('date-btn');
+  if (dpMode === 'day-range') {
+    if (!dpState.start) return;
+    const end = dpState.end || dpState.start;
+    activeFilter = { type: 'day-range',
+      from: dpState.start.getFullYear()*10000 + (dpState.start.getMonth()+1)*100 + dpState.start.getDate(),
+      to:   end.getFullYear()*10000 + (end.getMonth()+1)*100 + end.getDate() };
+    const startStr = fmtDate(dpState.start);
+    const endStr = dpState.end ? fmtDate(dpState.end) : null;
+    btn.textContent = `${endStr && endStr !== startStr ? startStr + ' – ' + endStr : startStr}`;
+  } else if (dpMode === 'month-range') {
+    if (!dpState.startMonth) return;
+    const em = dpState.endMonth || dpState.startMonth;
+    activeFilter = { type: 'month-range',
+      from: dpState.startMonth.y*100 + dpState.startMonth.m,
+      to:   em.y*100 + em.m };
+    const startStr = fmtMonth(dpState.startMonth);
+    const endStr = dpState.endMonth ? fmtMonth(dpState.endMonth) : null;
+    btn.textContent = `${endStr && endStr !== startStr ? startStr + ' – ' + endStr : startStr}`;
+  } else if (dpMode === 'year-range') {
+    if (dpState.startYear === null || dpState.startYear === undefined) return;
+    const ey = dpState.endYear !== undefined ? dpState.endYear : dpState.startYear;
+    activeFilter = { type: 'year-range', from: dpState.startYear, to: ey };
+    btn.textContent = `${ey !== dpState.startYear ? dpState.startYear + '–' + ey : dpState.startYear}`;
+  }
+  btn.classList.add('active');
+  document.getElementById('date-picker-popup').classList.remove('open');
+  scheduleRedraw();
+});
+
+document.getElementById('dp-clear').addEventListener('click', function() {
+  activeFilter = null;
+  const btn = document.getElementById('date-btn');
+  btn.textContent = t('dateAll');
+  btn.classList.remove('active');
+  document.getElementById('date-picker-popup').classList.remove('open');
+  scheduleRedraw();
+});
+
+function dateInFilter(o) {
+  if (!activeFilter) return true;
+  const f = activeFilter;
+  const oVal = o.year*10000 + o.month*100 + o.day;
+  if (f.type === 'day-range') return oVal >= f.from && oVal <= f.to;
+  if (f.type === 'month-range') {
+    const oM = o.year*100 + (o.month - 1); // month is 0-indexed in filter
+    return oM >= f.from && oM <= f.to;
+  }
+  if (f.type === 'year-range') return o.year >= f.from && o.year <= f.to;
+  return true;
+}
+
+// ===================== COLOR / LEGEND =====================
+function getColor(count, max) {
+  const t = Math.min(Math.log(count+1)/Math.log(max+1), 1);
+  return `rgba(${Math.round(160-t*140)},${Math.round(200-t*170)},${Math.round(255-t*80)},${0.5+t*0.45})`;
+}
+function computeBreaks(max) {
+  if (max<=0) return [];
+  const breaks=[]; let prev=0;
+  for (let i=1;i<=5;i++) {
+    const val=Math.max(prev+1,Math.round(Math.pow(max,i/5)));
+    if (val>max&&i<5) continue;
+    breaks.push({val,label:prev+1===val?`${val}`:`${prev+1}–${val}`});
+    prev=val; if(val>=max)break;
+  }
+  return breaks;
+}
+function updateLegend(localMax) {
+  const hasSpecies=selectedSpecies.size>0;
+  const useSp=!hasSpecies&&mode==='species';
+  document.getElementById('legend-title').textContent=hasSpecies?(selectedSpecies.size===1?[...selectedSpecies][0]:t('speciesTitle',selectedSpecies.size)):(useSp?t('spRadio'):t('observations'));
+  if(localMax!==undefined)currentBreaks=computeBreaks(localMax);
+  for(let i=1;i<=5;i++){
+    const b=currentBreaks[i-1],row=document.getElementById(`l${i}`).parentElement;
+    if(b){document.getElementById(`s${i}`).style.background=getColor(b.val,currentBreaks[currentBreaks.length-1].val);document.getElementById(`l${i}`).textContent=b.label;row.style.display='flex';}
+    else row.style.display='none';
+  }
+}
+
+// ===================== GRID =====================
+function getFilteredObservations() {
+  return observations.filter(o => {
+    if (selectedSpecies.size>0&&!selectedSpecies.has(o.species)) return false;
+    return dateInFilter(o);
+  });
+}
+
+// Cell popup logic
+let cellDataMap = new Map(); // key -> array of obs
+
+function fmtDateShort(o) {
+  if (!o.year) return '';
+  return t('fmtDate', o.day, o.month, o.year);
+}
+
+function showCellPopup(key, screenX, screenY) {
+  const rows = cellDataMap.get(key);
+  if (!rows || !rows.length) return;
+  const useSp = selectedSpecies.size === 0 && mode === 'species';
+  const popup = document.getElementById('cell-popup');
+  const title = document.getElementById('cell-popup-title');
+  const body = document.getElementById('cell-popup-body');
+
+  // Sort by date descending (newest first)
+  const sorted = [...rows].sort((a,b) => {
+    const av = a.year*10000+a.month*100+a.day;
+    const bv = b.year*10000+b.month*100+b.day;
+    return bv - av;
+  });
+
+  if (useSp) {
+    // Species mode: list unique species, date of first obs, sorted by first-seen date
+    const speciesMap = new Map();
+    for (const o of sorted) {
+      if (!speciesMap.has(o.species)) speciesMap.set(o.species, o);
+    }
+    const specList = [...speciesMap.values()];
+    title.textContent = t('speciesTitle', specList.length);
+    let num = 1;
+    const rowsHtml = specList.map(o => {
+      const dateLink = o.checklistId
+        ? `<a href="https://ebird.org/checklist/${o.checklistId}" target="_blank">${fmtDateShort(o)}</a>`
+        : fmtDateShort(o);
+      return `<tr><td>${num++}</td><td>${o.species}</td><td>${dateLink}</td></tr>`;
+    }).join('');
+    body.innerHTML = `<table><thead><tr><th>${t('colNum')}</th><th>${t('colSpecies')}</th><th>${t('colDate')}</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  } else {
+    // Observation mode: list all obs sorted by date ascending
+    title.textContent = t('obsTitle', sorted.length);
+    const rowsHtml = sorted.map(o => {
+      const dateLink = o.checklistId
+        ? `<a href="https://ebird.org/checklist/${o.checklistId}" target="_blank">${fmtDateShort(o)}</a>`
+        : fmtDateShort(o);
+      return `<tr><td>${dateLink}</td><td>${o.species}</td><td>${o.location}</td></tr>`;
+    }).join('');
+    body.innerHTML = `<table><thead><tr><th>${t('colDate')}</th><th>${t('colSpecies')}</th><th>${t('colLocation')}</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  }
+
+  // Position popup near click but keep on screen
+  const pw = 520, ph = 420;
+  let px = screenX + 12, py = screenY - 20;
+  if (px + pw > window.innerWidth - 10) px = screenX - pw - 12;
+  if (py + ph > window.innerHeight - 10) py = window.innerHeight - ph - 10;
+  if (py < 55) py = 55;
+  popup.style.left = px + 'px';
+  popup.style.top = py + 'px';
+  popup.classList.add('open');
+}
+
+document.getElementById('cell-popup-close').addEventListener('click', () => {
+  document.getElementById('cell-popup').classList.remove('open');
+});
+
+map.on('click', () => {
+  document.getElementById('cell-popup').classList.remove('open');
+});
+
+function buildGrid() {
+  if (!observations.length) return;
+  if (cellLayer) { map.removeLayer(cellLayer); cellLayer=null; }
+  document.getElementById('cell-popup').classList.remove('open');
+  const filtered=getFilteredObservations();
+  document.getElementById('status').textContent=filtered.length===observations.length
+    ? t('loaded', observations.length)
+    : t('shown', filtered.length, observations.length);
+
+  const zoom=map.getZoom(), size=(10/Math.pow(2,zoom-2))/4*cellScale*1.26;
+  const bounds=map.getBounds(), pad=size*2;
+  const minLat=bounds.getSouth()-pad,maxLat=bounds.getNorth()+pad;
+  const minLng=bounds.getWest()-pad,maxLng=bounds.getEast()+pad;
+  const grid=new Map(), useSp=selectedSpecies.size===0&&mode==='species';
+  cellDataMap = new Map();
+
+  for(const o of filtered){
+    const {lat,lng,species} = o;
+    if(lat<minLat||lat>maxLat)continue;
+    const key=`${Math.floor(lat/size)},${Math.floor(lng/size)}`;
+    if(useSp){if(!grid.has(key))grid.set(key,new Set());grid.get(key).add(species);}
+    else grid.set(key,(grid.get(key)||0)+1);
+    if(!cellDataMap.has(key))cellDataMap.set(key,[]);
+    cellDataMap.get(key).push(o);
+  }
+
+  let localMax=1;
+  for(const v of grid.values()){const n=useSp?v.size:v;if(n>localMax)localMax=n;}
+  updateLegend(localMax);
+  const rects=[];
+
+  for(const [key,val] of grid){
+    const [row,col]=key.split(',').map(Number);
+    const count=useSp?val.size:val;
+    const s=row*size,n=s+size,wb=col*size,eb=wb+size;
+    const label=useSp?(lang==='zh'?`${count}种`:`${count} species`):(lang==='zh'?`${count}条记录`:`${count} observation${count>1?'s':''}`);
+    const color=getColor(count,localMax);
+    for(let off=-360;off<=360;off+=360){
+      const w=wb+off,e=eb+off;
+      if(e<minLng||w>maxLng)continue;
+      const rect=L.rectangle([[s,w],[n,e]],{color:'rgba(255,255,255,0.35)',fillColor:color,fillOpacity:1,weight:0.5}).bindTooltip(label,{sticky:true});
+      rect.on('click', function(ev) {
+        L.DomEvent.stopPropagation(ev);
+        showCellPopup(key, ev.originalEvent.clientX, ev.originalEvent.clientY);
+      });
+      rects.push(rect);
+    }
+  }
+  cellLayer=L.layerGroup(rects).addTo(map);
+}
+
+let redrawTimer=null;
+function scheduleRedraw(){clearTimeout(redrawTimer);redrawTimer=setTimeout(buildGrid,150);}
+map.on('moveend',scheduleRedraw);map.on('zoomend',scheduleRedraw);
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',function(){mode=this.value;buildGrid();}));
+document.getElementById('cell-slider').addEventListener('input',function(){cellScale=parseFloat(this.value);document.getElementById('slider-val').textContent=cellScale.toFixed(1)+'×';scheduleRedraw();});
+
+// ===================== SPECIES =====================
+const speciesInput=document.getElementById('species-input');
+const speciesDropdown=document.getElementById('species-dropdown');
+function normSearch(s) {
+  // For CJK characters: just lowercase, no normalization needed
+  // For latin: strip accents, punctuation, collapse spaces
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    // Strip combining diacritical marks (accents) but preserve CJK
+    .replace(/[\u0300-\u036f]/g, '')
+    // Remove apostrophes and quotes
+    .replace(/[''`´'"]/g, '')
+    // Collapse dashes, underscores, punctuation to space (but not CJK punctuation like 、。)
+    .replace(/[-_.,;:!?&()\/\\]+/g, ' ')
+    // Collapse whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function renderDropdown(q){
+  const qn = normSearch(q || '');
+  let matches;
+  if (!qn) {
+    matches = allSpecies.slice(0, 80);
+  } else {
+    matches = allSpecies.filter(s => {
+      if (normSearch(s).includes(qn)) return true;
+      const sci = speciesScientific.get(s) || '';
+      if (normSearch(sci).includes(qn)) return true;
+      return false;
+    }).slice(0, 80);
+  }
+  if(!matches.length){speciesDropdown.style.display='none';return;}
+  speciesDropdown.innerHTML=matches.map(s=>{
+    const sci = speciesScientific.get(s) || '';
+    const sciHtml = sci ? `<div style="font-style:italic;color:#888;font-size:11px;line-height:1.3;margin-top:1px">${sci}</div>` : '';
+    return `<div class="${selectedSpecies.has(s)?'selected':''}" data-species="${s}" style="display:block;padding:5px 8px">
+      <div style="display:flex;align-items:center;gap:6px"><input type="checkbox" ${selectedSpecies.has(s)?'checked':''} onclick="return false"><span>${s}</span></div>
+      ${sci ? `<div style="padding-left:22px">${sciHtml}</div>` : ''}
+    </div>`;
+  }).join('');
+  speciesDropdown.style.display='block';
+}
+function renderTags(){
+  document.getElementById('selected-tags').innerHTML=[...selectedSpecies].map(s=>`<span class="species-tag">${s} <span class="remove-tag" data-sp="${s}">×</span></span>`).join('');
+  document.getElementById('clear-species').style.display=selectedSpecies.size>0?'inline':'none';
+  document.getElementById('toggle-wrap').style.display=selectedSpecies.size>0?'none':'flex';
+}
+speciesInput.addEventListener('input',()=>renderDropdown(speciesInput.value));
+speciesInput.addEventListener('focus',()=>renderDropdown(speciesInput.value));
+speciesDropdown.addEventListener('mousedown',function(e){
+  e.preventDefault();
+  const div=e.target.closest('[data-species]');if(!div)return;
+  const sp=div.dataset.species;selectedSpecies.has(sp)?selectedSpecies.delete(sp):selectedSpecies.add(sp);
+  renderDropdown(speciesInput.value);renderTags();buildGrid();
+});
+document.getElementById('selected-tags').addEventListener('click',function(e){
+  const btn=e.target.closest('.remove-tag');if(!btn)return;
+  selectedSpecies.delete(btn.dataset.sp);renderTags();renderDropdown(speciesInput.value);buildGrid();
+});
+document.getElementById('clear-species').addEventListener('click',function(){
+  selectedSpecies.clear();speciesInput.value='';speciesDropdown.style.display='none';renderTags();buildGrid();
+});
+document.addEventListener('click',function(e){
+  if(!document.getElementById('species-wrap').contains(e.target)&&!document.getElementById('selected-tags').contains(e.target))
+    speciesDropdown.style.display='none';
+});
+
+
+// ===================== GCJ-02 → WGS-84 CONVERSION =====================
+// Only applied to coordinates within China's approximate bounding box
+function gcj02ToWgs84(lat, lng, inChina) {
+  if (!inChina) return [lat, lng];
+  const a = 6378245.0, ee = 0.00669342162296594323;
+  let dLat = transformLat(lng - 105.0, lat - 35.0);
+  let dLng = transformLng(lng - 105.0, lat - 35.0);
+  const radLat = lat / 180.0 * Math.PI;
+  let magic = Math.sin(radLat);
+  magic = 1 - ee * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+  dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+  return [lat - dLat, lng - dLng];
+}
+
+function transformLat(x, y) {
+  let ret = -100.0 + 2.0*x + 3.0*y + 0.2*y*y + 0.1*x*y + 0.2*Math.sqrt(Math.abs(x));
+  ret += (20.0*Math.sin(6.0*x*Math.PI) + 20.0*Math.sin(2.0*x*Math.PI)) * 2.0/3.0;
+  ret += (20.0*Math.sin(y*Math.PI) + 40.0*Math.sin(y/3.0*Math.PI)) * 2.0/3.0;
+  ret += (160.0*Math.sin(y/12.0*Math.PI) + 320.0*Math.sin(y*Math.PI/30.0)) * 2.0/3.0;
+  return ret;
+}
+
+function transformLng(x, y) {
+  let ret = 300.0 + x + 2.0*y + 0.1*x*x + 0.1*x*y + 0.1*Math.sqrt(Math.abs(x));
+  ret += (20.0*Math.sin(6.0*x*Math.PI) + 20.0*Math.sin(2.0*x*Math.PI)) * 2.0/3.0;
+  ret += (20.0*Math.sin(x*Math.PI) + 40.0*Math.sin(x/3.0*Math.PI)) * 2.0/3.0;
+  ret += (150.0*Math.sin(x/12.0*Math.PI) + 300.0*Math.sin(x/30.0*Math.PI)) * 2.0/3.0;
+  return ret;
+}
+
+// ===================== CSV LOAD =====================
+document.getElementById('file-input').addEventListener('change',function(e){
+  const file=e.target.files[0];if(!file)return;
+  document.getElementById('file-name').textContent=file.name;
+  document.getElementById('status').textContent=t('loading');
+  Papa.parse(file,{header:true,skipEmptyLines:true,complete:function(results){
+    observations=[];
+    for(const row of results.data){
+      let lat=parseFloat(row['Latitude']),lng=parseFloat(row['Longitude']);
+      if(isNaN(lat)||isNaN(lng))continue;
+      const stateProvince=(row['State/Province']||'').trim();
+      const inChina = stateProvince.startsWith('CN-');
+      [lat, lng] = gcj02ToWgs84(lat, lng, inChina);
+      const species=(row['Common Name']||'Unknown').trim();
+      const scientific=(row['Scientific Name']||'').trim();
+      const raw=(row['Date']||'').trim();
+      let year=0,month=0,day=0;
+      if(raw){const p=raw.split(/[-\/]/);if(p.length===3){year=parseInt(p[0],10);month=parseInt(p[1],10);day=parseInt(p[2],10);}}
+      const checklistId=(row['Submission ID']||'').trim();
+      const location=(row['Location']||'').trim();
+      observations.push({lat,lng,species,scientific,year,month,day,checklistId,location});
+    }
+    allSpecies=[...new Set(observations.map(o=>o.species))].sort();
+    speciesScientific = new Map();
+    for (const o of observations) {
+      if (o.scientific && !speciesScientific.has(o.species)) speciesScientific.set(o.species, o.scientific);
+    }
+    document.getElementById('status').textContent=t('loaded', observations.length);
+    ['legend','toggle-wrap','slider-panel','date-filter-wrap','species-filter-wrap'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.style.display=id==='slider-panel'?'flex':id==='legend'?'block':'flex';
+    });
+    const lats=observations.map(o=>o.lat),lngs=observations.map(o=>o.lng);
+    map.fitBounds([[Math.min(...lats),Math.min(...lngs)],[Math.max(...lats),Math.max(...lngs)]],{padding:[40,40]});
+    buildGrid();
+  },error:()=>{document.getElementById('status').textContent=(lang==='zh'?'CSV 解析失败。':'Error parsing CSV.');}});
+});
+
+
+// ===================== I18N =====================
+let lang = 'en';
+
+const I18N = {
+  en: {
+    title: 'BirdGrid',
+    upload: 'Upload your eBird CSV to begin.',
+    chooseFile: 'Choose File',
+    loading: 'Parsing...',
+    loaded: n => `${n.toLocaleString()} observations loaded.`,
+    shown: (f,t) => `${f.toLocaleString()} of ${t.toLocaleString()} observations shown.`,
+    dateAll: 'Date: All',
+    dateBtn: 'Date',
+    datePlaceholder: 'Date: All',
+    dayRange: 'Day range',
+    monthRange: 'Month range',
+    yearRange: 'Year range',
+    apply: 'Apply',
+    clear: 'Clear',
+    clickStart: 'Click start date',
+    clickEnd: 'Click end date',
+    speciesLabel: 'Species:',
+    searchPlaceholder: 'Search...',
+    clearAll: 'Clear all',
+    observations: 'Observations',
+    obsRadio: 'Observations',
+    spRadio: 'Species',
+    cellSize: 'Cell size',
+    speciesTitle: n => `${n} species`,
+    obsTitle: n => `${n} observation${n>1?'s':''}`,
+    colDate: 'Date',
+    colSpecies: 'Species',
+    colLocation: 'Location',
+    colNum: '#',
+    months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    dows: ['Su','Mo','Tu','We','Th','Fr','Sa'],
+    fmtDate: (d,m,y) => `${d} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]} ${y}`,
+    fmtMonth: (m,y) => `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]} ${y}`,
+  },
+  zh: {
+    title: 'BirdGrid',
+    upload: '请上传 eBird CSV 文件',
+    chooseFile: '选择文件',
+    loading: '解析中…',
+    loaded: n => `已加载 ${n.toLocaleString()} 条记录`,
+    shown: (f,t) => `显示 ${f.toLocaleString()} / ${t.toLocaleString()} 条记录`,
+    dateAll: '日期：全部',
+    dateBtn: '日期',
+    datePlaceholder: '日期：全部',
+    dayRange: '日期范围',
+    monthRange: '月份范围',
+    yearRange: '年份范围',
+    apply: '应用',
+    clear: '清除',
+    clickStart: '点击起始日期',
+    clickEnd: '点击结束日期',
+    speciesLabel: '鸟种：',
+    searchPlaceholder: '搜索…',
+    clearAll: '清除全部',
+    observations: '记录数',
+    obsRadio: '记录数',
+    spRadio: '鸟种数',
+    cellSize: '方格大小',
+    speciesTitle: n => `${n}鸟种`,
+    obsTitle: n => `${n}条记录`,
+    colDate: '日期',
+    colSpecies: '鸟种',
+    colLocation: '观测地点',
+    colNum: '序号',
+    months: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+    dows: ['日','一','二','三','四','五','六'],
+    fmtDate: (d,m,y) => `${y}年${m}月${d}日`,
+    fmtMonth: (m,y) => `${y}年${m+1}月`,
+  }
+};
+
+function t(key, ...args) {
+  const val = I18N[lang][key];
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function applyLang() {
+  const s = I18N[lang];
+  document.getElementById('btn-en').classList.toggle('active', lang==='en');
+  document.getElementById('btn-zh').classList.toggle('active', lang==='zh');
+  document.title = 'BirdGrid';
+  const subtitle = document.getElementById('app-subtitle');
+  if (subtitle) subtitle.textContent = lang === 'zh' ? 'eBird 观鸟地图' : 'eBird Observation Map';
+
+  // File label
+  const fileLabelText = document.getElementById('file-label-text');
+  if (fileLabelText) fileLabelText.textContent = s.chooseFile;
+
+  // Status
+  const statusEl = document.getElementById('status');
+  if (!observations.length) statusEl.textContent = s.upload;
+
+  // Date button (only reset label if no filter active)
+  if (!activeFilter) document.getElementById('date-btn').textContent = s.dateAll;
+
+  // Date tabs
+  const tabs = document.querySelectorAll('.dp-tab');
+  const tabKeys = ['dayRange','monthRange','yearRange'];
+  tabs.forEach((tab,i) => { if(tabKeys[i]) tab.textContent = s[tabKeys[i]]; });
+
+  // Apply/Clear buttons
+  document.getElementById('dp-apply').textContent = s.apply;
+  document.getElementById('dp-clear').textContent = s.clear;
+
+  // Species label & placeholder
+  const spLabel = document.querySelector('#species-filter-wrap > label');
+  if (spLabel) spLabel.textContent = s.speciesLabel;
+  document.getElementById('species-input').placeholder = s.searchPlaceholder;
+
+  // Clear all button
+  const clearBtn = document.getElementById('clear-species');
+  if (clearBtn) clearBtn.textContent = s.clearAll;
+
+  // Mode toggle radios
+  const radios = document.querySelectorAll('input[name=mode]');
+  if (radios[0]) {
+    const lbl = radios[0].parentElement;
+    lbl.childNodes[lbl.childNodes.length-1].textContent = ' ' + s.obsRadio;
+  }
+  if (radios[1]) {
+    const lbl = radios[1].parentElement;
+    lbl.childNodes[lbl.childNodes.length-1].textContent = ' ' + s.spRadio;
+  }
+
+  // Cell size label
+  const cellSizeLabel = document.querySelector('#slider-panel span:first-child');
+  if (cellSizeLabel) cellSizeLabel.textContent = s.cellSize;
+
+  // Re-render legend title
+  updateLegend();
+  // Rebuild grid so tooltips use current language
+  if (observations.length) scheduleRedraw();
+  // Re-render date picker if open
+  if (document.getElementById('date-picker-popup').classList.contains('open')) renderDpBody();
+  // Re-render dropdown if open
+  if (speciesDropdown.style.display === 'block') renderDropdown(speciesInput.value);
+}
+
+document.getElementById('btn-en').addEventListener('click', () => { lang='en'; applyLang(); });
+document.getElementById('btn-zh').addEventListener('click', () => { lang='zh'; applyLang(); });
+document.querySelector('.lang-pill').addEventListener('click', function(e) {
+  if (e.target === this) { lang = lang==='en'?'zh':'en'; applyLang(); }
+});
+
+updateLegend(10);
+
+// Fix logo height to bar's initial height on load
+window.addEventListener('load', function() {
+  const bar = document.getElementById('top');
+  const logo = document.getElementById('logo');
+  const h = bar.getBoundingClientRect().height;
+  logo.querySelectorAll('span').forEach(s => s.style.height = h + 'px');
+});
+</script>
+</body>
+</html>
